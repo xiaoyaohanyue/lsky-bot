@@ -1,0 +1,19 @@
+services:
+  lsky-bot:
+    image: ghcr.io/xiaoyaohanyue/lsky-bot:latest
+    container_name: lsky-bot
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - lsky-net
+    volumes:
+      - ./logs:/app/logs
+      - ./conf/.env:/app/conf/.env
+  
+networks:
+  lsky-net:
+    driver: bridge
