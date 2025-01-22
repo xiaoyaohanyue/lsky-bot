@@ -18,7 +18,7 @@
 ```shell
 mkdir -p /opt/lsky_bot
 cd /opt/lsky_bot
-git clone https://github.com/xiaoyaohanyue/lsky_tgbot.git .
+git clone https://github.com/xiaoyaohanyue/lsky-bot.git .
 cp conf/.env.example conf/.env
 ##修改.env文件
 docker compose up -d

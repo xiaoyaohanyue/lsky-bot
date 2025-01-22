@@ -1,6 +1,6 @@
 services:
   lsky-bot:
-    build: .
+    image: ghcr.io/xiaoyaohanyue/lsky-bot:latest
     container_name: lsky-bot
     restart: always
     logging:
