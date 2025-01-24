@@ -3,6 +3,7 @@ from src.sql.handle import Handle
 from src.bot.handle import BotHandle
 from src.lsky.api import LskyAPI
 import subprocess,logging
+from src.utils.utils import YyUtils
 from conf.config import *
 from telethon.tl.types import MessageMediaPhoto,MessageMediaDocument
 import textwrap
@@ -37,6 +38,7 @@ class Bot():
     async def enable(self):
         handle = Handle()
         lsky = LskyAPI()
+        yyutils = YyUtils()
         logger.info('机器人启动中...')
         logger.info(handle.init())
         await self.client.start(bot_token=self.BOT_TOKEN)
@@ -74,6 +76,14 @@ class Bot():
                             file_path = await self.client.download_media(event.message, self.SAVE_PATH)
                             profile = handle.get_profile(tgid)
                             response = lsky.upload_image(lsky_token, {'file': file_path, 'album_id': profile['album_id'], 'permission': profile['permission']})
+                    elif yyutils.is_valid_url(text) and yyutils.is_image_url(text):
+                        logger.info(f'检测到URL下载图片 {text}')
+                        img = yyutils.download_image(text, self.SAVE_PATH)
+                        if img['status']:
+                            file_path = img['path']
+                            profile = handle.get_profile(tgid)
+                            response = lsky.upload_image(lsky_token, {'file': file_path, 'album_id': profile['album_id'], 'permission': profile['permission']})
+
                     else:
                         await event.reply("我只处理图片哦！")
                         return 0
@@ -92,6 +102,10 @@ class Bot():
                         await event.reply(msg)
                         handle.add_usage(tg_id,lsky_token,permission=user_permission['permission'])
                     else:
+                        try:
+                            os.remove(file_path)
+                        except:
+                            pass
                         await event.reply('上传失败，请检查图片是否符合要求。')
                     
                 else:

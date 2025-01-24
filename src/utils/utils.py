@@ -1,6 +1,13 @@
 import uuid
 import time
 import hashlib
+import requests
+import logging
+import re
+from urllib.parse import urlparse
+
+
+logger = logging.getLogger(__name__)
 
 class YyUtils:
     def __init__(self):
@@ -26,5 +33,47 @@ class YyUtils:
     
     def transform_timestamp_to_str(self, timestamp):
         return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
-
+    
+    def is_image_url(self, url):
+        try:
+            header = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'}
+            response = requests.head(url, timeout=5, headers=header)
+            content_type = response.headers.get('Content-Type', '')
+            if content_type.startswith('image/'):
+                return True
+        except:
+            logger.error('check_url_resource error: %s', url)
+        return False
+    
+    def is_valid_url(self,url):
+        try:
+            result = urlparse(url)
+            return all([result.scheme in ["http", "https"], result.netloc])
+        except ValueError:
+            return False
+        
+    def download_image(self, url, save_path):
+        try:
+            response = requests.get(url, stream=True)
+            if response.status_code == 200:
+                filename = re.search(r'([^/]+\.(jpg|png|jpeg|gif|webp))$', url).group(1)
+                type_name = self.match_image_suffix(re.findall(r'image/(\w+)', response.headers.get('Content-Type', ''))[0])
+                logger.info('type_name: %s', type_name)
+                if not filename:
+                    filename = f'image-{int(time.time())}.{type_name}'
+                target_path = f'{save_path}{filename}'
+                logger.info('download_image: %s', target_path)
+                with open(target_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=1024):
+                        if chunk:
+                            f.write(chunk)
+            return {'status': True, 'path': target_path}
+        except:
+            logger.error('download_image error: %s', url)
+            return {'status': False, 'path': ''}
+    
+    def match_image_suffix(self, mime_type):
+        if mime_type == 'jpeg':
+            return 'jpg'
+        return mime_type
 
