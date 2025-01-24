@@ -1,0 +1,16 @@
+[Unit]
+Description=Lsky Bot
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/lsky_bot/dist/linux/main
+WorkingDirectory=/opt/lsky_bot/dist/linux
+User=root
+Group=root
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
