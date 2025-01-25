@@ -49,9 +49,13 @@ class LskyAPI:
             return ori
         elif ori['status'] == False:
             return {'status': False}
+        try: 
+        	username = ori['data']['username']
+        except:
+            username = ori['data']['email']
         return {
             'status': True,
-            'username': ori['data']['username'],
+            'username': username,
             'name': ori['data']['name'],
             'email': ori['data']['email'],
             'capacity': ori['data']['capacity'],
