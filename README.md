@@ -21,7 +21,7 @@ cd /opt/lsky_bot
 git clone https://github.com/xiaoyaohanyue/lsky-bot.git .
 cp conf/.env.example conf/.env
 ##修改.env文件
-docker compose up -d
+docker compose up --pull always -d
 ```
 
 ## 配置.env文件
