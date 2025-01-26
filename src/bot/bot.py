@@ -19,6 +19,7 @@ class Bot():
         self.OWNER_USERNAME = OWNER_USERNAME
         self.BOT_USERNAME = BOT_USERNAME
         self.bothandle = BotHandle(self.client)
+        self.LSKY_VERSION = LSKY_VERSION
         self.help_content = textwrap.dedent('''
         /start - 开始使用
         /bind - 绑定账号
@@ -43,6 +44,7 @@ class Bot():
         logger.info(handle.init())
         await self.client.start(bot_token=self.BOT_TOKEN)
         logger.info('机器人启动成功')
+        logger.info(f'当前机器人适用于{yyutils.echo_lsky_version()}图床系统')
         owenr = await self.bothandle.get_id(self.OWNER_USERNAME)
         handle.add_owner(owenr,self.OWNER_USERNAME)
         @self.client.on(events.NewMessage())
@@ -67,39 +69,38 @@ class Bot():
                     if isinstance(event.message.media, MessageMediaPhoto):
                         # 下载图片到指定路径
                         file_path = await self.client.download_media(event.message, self.SAVE_PATH)
-                        profile = handle.get_profile(tgid)
-                        response = lsky.upload_image(lsky_token, {'file': file_path, 'album_id': profile['album_id'], 'permission': profile['permission']})
+                        if self.LSKY_VERSION == 'free':
+                            response = lsky.upload_image(lsky_token, {'file': file_path})
+                        else:
+                            profile = handle.get_profile(tgid)
+                            response = lsky.upload_image(lsky_token, {'file': file_path, 'album_id': profile['album_id'], 'permission': profile['permission']})
                     elif isinstance(event.message.media, MessageMediaDocument):
                         mime_type = event.message.media.document.mime_type
                         if mime_type.startswith('image/'):
                             # 下载图片到指定路径
                             file_path = await self.client.download_media(event.message, self.SAVE_PATH)
-                            profile = handle.get_profile(tgid)
-                            response = lsky.upload_image(lsky_token, {'file': file_path, 'album_id': profile['album_id'], 'permission': profile['permission']})
+                            if self.LSKY_VERSION == 'free':
+                                response = lsky.upload_image(lsky_token, {'file': file_path})
+                            else:
+                                profile = handle.get_profile(tgid)
+                                response = lsky.upload_image(lsky_token, {'file': file_path, 'album_id': profile['album_id'], 'permission': profile['permission']})
                     elif yyutils.is_valid_url(text) and yyutils.is_image_url(text):
                         logger.info(f'检测到URL下载图片 {text}')
                         img = yyutils.download_image(text, self.SAVE_PATH)
                         if img['status']:
                             file_path = img['path']
-                            profile = handle.get_profile(tgid)
-                            response = lsky.upload_image(lsky_token, {'file': file_path, 'album_id': profile['album_id'], 'permission': profile['permission']})
+                            if self.LSKY_VERSION == 'free':
+                                response = lsky.upload_image(lsky_token, {'file': file_path})
+                            else:
+                                profile = handle.get_profile(tgid)
+                                response = lsky.upload_image(lsky_token, {'file': file_path, 'album_id': profile['album_id'], 'permission': profile['permission']})
 
                     else:
                         await event.reply("我只处理图片哦！")
                         return 0
                     if response['status']:
                         os.remove(file_path)
-                        msg = textwrap.dedent(f'''
-                        上传成功！
-                        图片链接: `{response['links']['url']}`
-                        HTML链接: `{response['links']['html']}`
-                        BBCode链接: `{response['links']['bbcode']}`
-                        Markdown链接: `{response['links']['markdown']}`
-                        Markdown带链接: `{response['links']['markdown_with_link']}`
-                        缩略图: `{response['links']['thumbnail_url']}`
-                        删除链接: `{response['links']['delete_url']}`
-                        ''')
-                        await event.reply(msg)
+                        await self.bothandle.img_response(response, event)
                         handle.add_usage(tg_id,lsky_token,permission=user_permission['permission'])
                     else:
                         try:
@@ -188,6 +189,9 @@ class Bot():
                 if not handle.check_bind(tg_id):
                     await event.respond('请先绑定账号，发送 /bind token 进行绑定。')
                     return 0
+                if self.LSKY_VERSION == 'free':
+                    await event.respond('开源版无需设置上传策略')
+                    return 0
                 profile = handle.get_profile(tg_id)
                 if profile:
                     msg = textwrap.dedent(f'''
@@ -211,6 +215,9 @@ class Bot():
                 if len(arg_count) != 3:
                     await event.respond('请按照 /setprofile 权限 相册ID 格式发送')
                     return 0
+                if self.LSKY_VERSION == 'free':
+                    await event.respond('开源版无需设置上传策略')
+                    return 0
                 permission = arg_count[1]
                 album_id = arg_count[2]
                 if permission not in ['1','0']:
@@ -233,10 +240,21 @@ class Bot():
                     return 0
                 message = event.message.message
                 arg_count = message.split(' ')
-                if len(arg_count) != 2:
-                    await event.respond('请按照 /bind token 格式发送')
-                    return 0
-                token = arg_count[1]
+                if self.LSKY_VERSION == 'free':
+                    if len(arg_count) != 3:
+                        await event.respond('请按照 /bind 图床账号 图床密码 格式发送')
+                        return 0
+                    res = lsky.get_token({'email':arg_count[1],'password':arg_count[2]})
+                    if res['status']:
+                        token = res['token']
+                    else:
+                        await event.respond('绑定失败，请检查账号密码是否正确')
+                        return 0
+                else:
+                    if len(arg_count) != 2:
+                        await event.respond('请按照 /bind token 格式发送')
+                        return 0
+                    token = arg_count[1]
                 if lsky.me(token)['status']:
                     handle.update_user(tg_id,token)
                     await event.respond('绑定成功！')

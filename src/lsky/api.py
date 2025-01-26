@@ -1,5 +1,5 @@
 import requests
-from conf.config import LSKY_API
+from conf.config import LSKY_API,LSKY_VERSION
 
 
 class LskyAPI:
@@ -22,15 +22,32 @@ class LskyAPI:
         except:
             return {'status': 'error', 'message': response.text}
     
-    def post(self, endpoint, token, data, files=None, headers=None) -> dict:
+    def post(self, endpoint, token=None, data={}, files=None, headers=None) -> dict:
         url = self.url + endpoint
-        if headers is None:
-            headers = self.headers(token)
+        if LSKY_VERSION == 'free' and endpoint == '/tokens':
+            headers = {
+                'User-Agent': 'yaoyue/lsky-api-client',
+                'Accept': 'application/json'
+            }
+        else:
+            if headers is None:
+                headers = self.headers(token)
         try:
             response = requests.post(url, headers=headers, data=data, files=files)
             return response.json()
         except:
             return {'status': 'error', 'message': response.text}
+    
+    def get_token(self, data) -> dict:
+        endpoint = '/tokens'
+        try:
+            email = data['email']
+            password = data['password']
+            response = self.post(endpoint, data={'email': email, 'password': password})
+            print(response)
+            return {'status': True, 'token': response['data']['token']}
+        except:
+            return {'status': 'error', 'message': response.message}
     
     def upload_image(self, token, datas) -> dict:
         endpoint = '/upload'
@@ -49,20 +66,24 @@ class LskyAPI:
             return ori
         elif ori['status'] == False:
             return {'status': False}
-        try: 
-        	username = ori['data']['username']
-        except:
-            username = ori['data']['email']
-        return {
-            'status': True,
-            'username': username,
-            'name': ori['data']['name'],
-            'email': ori['data']['email'],
-            'capacity': ori['data']['capacity'],
-            'used': ori['data']['size'],
-            'image_num': ori['data']['image_num'],
-            'albume_num': ori['data']['album_num']
-        }
+        else:
+            if LSKY_VERSION == 'free':
+                username = ori['data']['email']
+                used = ori['data']['used_capacity']
+            elif LSKY_VERSION == 'paid':
+                username = ori['data']['username']
+                used = ori['data']['size']
+            
+            return {
+                'status': True,
+                'username': username,
+                'name': ori['data']['name'],
+                'email': ori['data']['email'],
+                'capacity': ori['data']['capacity'],
+                'used': used,
+                'image_num': ori['data']['image_num'],
+                'albume_num': ori['data']['album_num']
+            }
     
     def albums(self, token) -> list:
         ori = self.get('/albums', token)
@@ -77,10 +98,3 @@ class LskyAPI:
         return {'status': True,'albums':albums}
     
     
-
-
-# token = '3|yJCrAL6D5YulzzKkeGSn2aQECEaPLBtp9iEt4UCX'
-# lsky = LskyAPI()
-# # res = lsky.upload_image(token, {'file': 'data/hkhk.png', 'album_id': 8})
-# res = lsky.me(token)['status']
-# print(res)

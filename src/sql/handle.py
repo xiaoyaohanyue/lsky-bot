@@ -385,6 +385,7 @@ class Handle:
         for table in self.table_list:
             if not self.check_table(table):
                 self.create_table(table)
+        return 0
         
         
     

@@ -4,6 +4,7 @@ import hashlib
 import requests
 import logging
 import re
+from conf.config import LSKY_VERSION
 from urllib.parse import urlparse
 
 
@@ -76,4 +77,9 @@ class YyUtils:
         if mime_type == 'jpeg':
             return 'jpg'
         return mime_type
+    
+    def echo_lsky_version(self):
+        if LSKY_VERSION == 'free':
+            return '开源版'
+        return '付费版'
 
