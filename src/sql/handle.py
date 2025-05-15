@@ -1,5 +1,5 @@
 from src.sql.sql import qlite3
-from conf.config import SQL_PATH
+from src.conf.config import SQL_PATH
 from src.utils.utils import YyUtils
 import logging
 
@@ -16,7 +16,7 @@ class Handle:
         if table_name == 'user':
             cmd = 'CREATE TABLE user (id INTEGER PRIMARY KEY AUTOINCREMENT, tg_id TEXT, lsky_token TEXT);'
         if table_name == 'lsky_profile':
-            cmd = 'CREATE TABLE lsky_profile (id INTEGER PRIMARY KEY AUTOINCREMENT, lsky_token TEXT, permission INTEGER, album_id INTEGER);'
+            cmd = 'CREATE TABLE lsky_profile (id INTEGER PRIMARY KEY AUTOINCREMENT, lsky_token TEXT, permission INTEGER, album_id INTEGER, storage_id INTEGER);'
         if table_name == 'usage':
             cmd = 'CREATE TABLE usage (id INTEGER PRIMARY KEY AUTOINCREMENT, tg_id TEXT, times TEXT, lsky_token TEXT);'
         if table_name == "block_list":
@@ -306,11 +306,11 @@ class Handle:
     
     def get_profile(self, tg_id):
         token = self.get_token(tg_id)
-        cmd = f"SELECT permission,album_id FROM lsky_profile WHERE lsky_token = '{token}'"
+        cmd = f"SELECT permission,album_id,storage_id FROM lsky_profile WHERE lsky_token = '{token}'"
         res = self.__sql.query(cmd)
         if not res:
             return False
-        return {"permission": res[0], "album_id": res[1]}
+        return {"permission": res[0], "album_id": res[1], "storage_id": res[2]}
     
     def update_user(self, tg_id, lsky_token):
         if self.check_exist(f"SELECT * FROM user WHERE tg_id = '{tg_id}'"):
@@ -321,13 +321,15 @@ class Handle:
         self.add_usage(tg_id, lsky_token, 'bind')
         self.update_lsky_profile(lsky_token, 0, 0)
     
-    def update_lsky_profile(self, lsky_token, album_id, permission=None):
+    def update_lsky_profile(self, lsky_token, album_id, permission=None, storage_id=None):
         if permission == None:
             permission = 0
+        if storage_id == None:
+            storage_id = 0
         if self.check_exist(f"SELECT * FROM lsky_profile WHERE lsky_token = '{lsky_token}'"):
-            cmd = f"UPDATE lsky_profile SET permission = '{permission}', album_id = '{album_id}' WHERE lsky_token = '{lsky_token}'"
+            cmd = f"UPDATE lsky_profile SET permission = '{permission}', album_id = '{album_id}', storage_id = '{storage_id}' WHERE lsky_token = '{lsky_token}'"
         else:
-            cmd = f"INSERT INTO lsky_profile (lsky_token, permission, album_id) VALUES ('{lsky_token}', '{permission}', '{album_id}')"
+            cmd = f"INSERT INTO lsky_profile (lsky_token, permission, album_id, storage_id) VALUES ('{lsky_token}', '{permission}', '{album_id}', '{storage_id}')"
         self.__sql.exec(cmd,True)
 
     def check_admin(self, tg_id):

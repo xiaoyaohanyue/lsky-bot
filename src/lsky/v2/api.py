@@ -1,8 +1,8 @@
 import requests
-from conf.config import LSKY_API,LSKY_VERSION
+from src.conf.config import LSKY_API,LSKY_VERSION
 
 
-class LskyAPI:
+class LskyAPIV2:
     def __init__(self):
         self.url = LSKY_API
 
@@ -36,7 +36,7 @@ class LskyAPI:
             response = requests.post(url, headers=headers, data=data, files=files)
             return response.json()
         except:
-            return {'status': 'error', 'message': response.text}
+            return {'status': 'error', 'message': response}
     
     def get_token(self, data) -> dict:
         endpoint = '/tokens'
@@ -55,13 +55,13 @@ class LskyAPI:
             files = {'file': file}
             try:
                 response = self.post(endpoint, token, datas, files=files)
-                links = response['data']['links']
+                links = response['data']['public_url']
                 return {'status': 'True', 'links': links}
             except:
                 return response
     
     def me(self, token) -> dict:
-        ori = self.get('/profile', token)
+        ori = self.get('/user/profile', token)
         if ori['status'] == 'error':
             return ori
         elif ori['status'] == False:
@@ -69,24 +69,24 @@ class LskyAPI:
         else:
             if LSKY_VERSION == 'free':
                 username = ori['data']['email']
-                used = ori['data']['used_capacity']
+                used = ori['data']['used_storage']
             elif LSKY_VERSION == 'paid':
                 username = ori['data']['username']
-                used = ori['data']['size']
+                used = ori['data']['used_storage']
             
             return {
                 'status': True,
                 'username': username,
                 'name': ori['data']['name'],
                 'email': ori['data']['email'],
-                'capacity': ori['data']['capacity'],
+                'capacity': ori['data']['total_storage'],
                 'used': used,
-                'image_num': ori['data']['image_num'],
-                'albume_num': ori['data']['album_num']
+                'image_num': ori['data']['photo_count'],
+                'albume_num': ori['data']['album_count']
             }
     
     def albums(self, token) -> list:
-        ori = self.get('/albums', token)
+        ori = self.get('/user/albums', token)
         if ori['status'] == 'error':
             return ori
         albums = []
@@ -96,5 +96,17 @@ class LskyAPI:
                 'name': album['name']
             })
         return {'status': True,'albums':albums}
+    
+    def capacities(self, token) -> list:
+        ori = self.get('/group', token)
+        if ori['status'] == 'error':
+            return ori
+        capacities = []
+        for capacity in ori['data']['storages']:
+            capacities.append({
+                'id': capacity['id'],
+                'name': capacity['name']
+            })
+        return {'status': True,'capacities':capacities}
     
     

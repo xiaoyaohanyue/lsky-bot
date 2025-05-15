@@ -1,10 +1,11 @@
 from telethon import TelegramClient, events, Button
 from src.sql.handle import Handle
 from src.bot.handle import BotHandle
-from src.lsky.api import LskyAPI
-import subprocess,logging
+from src.lsky.v1.api import LskyAPIV1
+from src.lsky.v2.api import LskyAPIV2
+import logging
 from src.utils.utils import YyUtils
-from conf.config import *
+from src.conf.config import *
 from telethon.tl.types import MessageMediaPhoto,MessageMediaDocument
 import textwrap
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ class Bot():
         /profile - 查看上传默认策略
         /setprofile - 设置上传默认策略
         /album - 查看相册列表
+        /capacities - 查看存储列表
         /getadmins - 查看管理员列表
         /addadmin - 添加管理员
         /deladmin - 删除管理员
@@ -38,7 +40,10 @@ class Bot():
         
     async def enable(self):
         handle = Handle()
-        lsky = LskyAPI()
+        if API_VERSION == 'v1':
+            lsky = LskyAPIV1()
+        elif API_VERSION == 'v2':
+            lsky = LskyAPIV2()
         yyutils = YyUtils()
         logger.info('机器人启动中...')
         logger.info(handle.init())
@@ -73,7 +78,10 @@ class Bot():
                             response = lsky.upload_image(lsky_token, {'file': file_path})
                         else:
                             profile = handle.get_profile(tgid)
-                            response = lsky.upload_image(lsky_token, {'file': file_path, 'album_id': profile['album_id'], 'permission': profile['permission']})
+                            if API_VERSION == 'v1':
+                                response = lsky.upload_image(lsky_token, {'file': file_path, 'album_id': profile['album_id'], 'permission': profile['permission']})
+                            else:
+                                response = lsky.upload_image(lsky_token, {'file': file_path, 'album_id': profile['album_id'], 'is_public': profile['permission'], 'storage_id': int(profile['storage_id'])})
                     elif isinstance(event.message.media, MessageMediaDocument):
                         mime_type = event.message.media.document.mime_type
                         if mime_type.startswith('image/'):
@@ -83,7 +91,10 @@ class Bot():
                                 response = lsky.upload_image(lsky_token, {'file': file_path})
                             else:
                                 profile = handle.get_profile(tgid)
-                                response = lsky.upload_image(lsky_token, {'file': file_path, 'album_id': profile['album_id'], 'permission': profile['permission']})
+                                if API_VERSION == 'v1':
+                                    response = lsky.upload_image(lsky_token, {'file': file_path, 'album_id': profile['album_id'], 'permission': profile['permission']})
+                                else:
+                                    response = lsky.upload_image(lsky_token, {'file': file_path, 'album_id': profile['album_id'], 'is_public': profile['permission'], 'storage_id': int(profile['storage_id'])})
                     elif yyutils.is_valid_url(text) and yyutils.is_image_url(text):
                         logger.info(f'检测到URL下载图片 {text}')
                         img = yyutils.download_image(text, self.SAVE_PATH)
@@ -93,8 +104,10 @@ class Bot():
                                 response = lsky.upload_image(lsky_token, {'file': file_path})
                             else:
                                 profile = handle.get_profile(tgid)
-                                response = lsky.upload_image(lsky_token, {'file': file_path, 'album_id': profile['album_id'], 'permission': profile['permission']})
-
+                                if API_VERSION == 'v1':
+                                    response = lsky.upload_image(lsky_token, {'file': file_path, 'album_id': profile['album_id'], 'permission': profile['permission']})
+                                else:
+                                    response = lsky.upload_image(lsky_token, {'file': file_path, 'album_id': profile['album_id'], 'is_public': profile['permission'], 'storage_id': int(profile['storage_id'])})
                     else:
                         await event.reply("我只处理图片哦！")
                         return 0
@@ -160,6 +173,26 @@ class Bot():
                 else:
                     await event.respond('获取相册列表失败，请检查token是否正确。')
         
+        @self.client.on(events.NewMessage(pattern='/capacities'))
+        async def capacities(event):
+            if event.is_private:
+                tg_id = event.sender_id
+                if API_VERSION == 'v1':
+                    await event.respond('该功能仅适用于v2版本')
+                    return 0
+                if not handle.check_bind(tg_id):
+                    await event.respond('请先绑定账号，发送 /bind token 进行绑定。')
+                    return 0
+                token = handle.get_token(tg_id)
+                res = lsky.capacities(token)
+                if res['status']:
+                    msg = '存储列表:\n'
+                    for capacities in res['capacities']:
+                        msg += f'{capacities["id"]} - {capacities["name"]}\n'
+                    await event.respond(msg)
+                else:
+                    await event.respond('获取存储列表失败，请检查token是否正确。')
+        
         @self.client.on(events.NewMessage(pattern='/my'))
         async def my(event):
             if event.is_private:
@@ -198,6 +231,7 @@ class Bot():
                     上传策略: 
                     图片权限: {'公开' if profile['permission'] == 1 else '私有'}
                     上传相册ID: {profile['album_id']}
+                    存储ID: {profile['storage_id']}
                     ''')
                     await event.respond(msg)
                 else:
@@ -212,22 +246,41 @@ class Bot():
                     return 0
                 message = event.message.message
                 arg_count = message.split(' ')
-                if len(arg_count) != 3:
-                    await event.respond('请按照 /setprofile 权限 相册ID 格式发送')
-                    return 0
-                if self.LSKY_VERSION == 'free':
-                    await event.respond('开源版无需设置上传策略')
-                    return 0
-                permission = arg_count[1]
-                album_id = arg_count[2]
-                if permission not in ['1','0']:
-                    await event.respond('权限只能是 1 或 0')
-                    return 0
-                if not album_id.isdigit():
-                    await event.respond('相册ID只能是数字')
-                    return 0
-                token = handle.get_token(tg_id)
-                handle.update_lsky_profile(token,album_id,permission)
+                if API_VERSION == 'v1':
+                    if len(arg_count) != 3:
+                        await event.respond('请按照 /setprofile 权限 相册ID 格式发送')
+                        return 0
+                    if self.LSKY_VERSION == 'free':
+                        await event.respond('开源版无需设置上传策略')
+                        return 0
+                    permission = arg_count[1]
+                    album_id = arg_count[2]
+                    if permission not in ['1','0']:
+                        await event.respond('权限只能是 1 或 0')
+                        return 0
+                    if not album_id.isdigit():
+                        await event.respond('相册ID只能是数字')
+                        return 0
+                    token = handle.get_token(tg_id)
+                    handle.update_lsky_profile(token,album_id,permission)
+                else:
+                    if len(arg_count) != 4:
+                        await event.respond('请按照 /setprofile 权限 相册ID 存储ID 格式发送')
+                        return 0
+                    permission = arg_count[1]
+                    album_id = arg_count[2]
+                    storage_id = arg_count[3]
+                    if permission not in ['1','0']:
+                        await event.respond('权限只能是 1 或 0')
+                        return 0
+                    if not album_id.isdigit():
+                        await event.respond('相册ID只能是数字')
+                        return 0
+                    if not storage_id.isdigit():
+                        await event.respond('存储ID只能是数字')
+                        return 0
+                    token = handle.get_token(tg_id)
+                    handle.update_lsky_profile(token,album_id,permission,storage_id)
                 await event.respond('设置成功！')
         
 

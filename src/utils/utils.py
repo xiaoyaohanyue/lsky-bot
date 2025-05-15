@@ -4,7 +4,7 @@ import hashlib
 import requests
 import logging
 import re
-from conf.config import LSKY_VERSION
+from src.conf.config import LSKY_VERSION
 from urllib.parse import urlparse
 
 

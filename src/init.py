@@ -1,5 +1,5 @@
 import logging
-from conf.config import *
+from src.conf.config import *
 
 
 class yyinit:
